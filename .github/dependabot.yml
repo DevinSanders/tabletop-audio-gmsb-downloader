@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # npm dependencies — weekly, grouped to keep PR noise low. CI gates each PR.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      production-dependencies:
+        dependency-type: production
+        update-types: ["minor", "patch"]
+      development-dependencies:
+        dependency-type: development
+        update-types: ["minor", "patch"]
+    # Majors (e.g. Electron) get their own PRs so they can be tested deliberately.
+
+  # GitHub Actions used by the CI/release workflows.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
