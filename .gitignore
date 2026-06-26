@@ -1,0 +1,15 @@
+node_modules/
+out/
+dist/
+*.log
+.DS_Store
+*.tsbuildinfo
+
+# Local app data / downloads captured during testing (may contain account data
+# and signed media URLs — never publish).
+Downloads/
+SoundPads/
+patreon-debug-*.json
+.tta-gmsb-ledger.json
+gmsb-library.json
+*.local

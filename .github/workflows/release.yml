@@ -1,0 +1,35 @@
+name: Release
+
+# Push a version tag (e.g. v0.1.0) to build installers for all three OSes and
+# attach them to a GitHub Release (created as a draft for you to review/publish).
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Build bundles
+        run: npx electron-vite build
+      - name: Build and publish installers
+        run: npx electron-builder --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No code-signing certs in CI; build unsigned.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
