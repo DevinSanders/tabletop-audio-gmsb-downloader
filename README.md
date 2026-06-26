@@ -12,9 +12,9 @@ It only ever accesses content your own account/tier already grants. See
 
 ## Screenshots
 
-Search, filter by variant and genre, and pick tracks. (Shown signed out, so only
-the free Full versions are listed; signing in adds the Patreon alternates and
-SoundPads.)
+Signed in with Patreon access: every track lists its available files (Full, the
+music/ambient stems, and alternates), and each **Sound Board** can be added as a
+GMSB shortcut page. Filter by variant, genre, or search, then select and download.
 
 ![Main window](docs/screenshots/main-window.png)
 
