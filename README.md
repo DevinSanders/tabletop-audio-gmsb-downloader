@@ -10,6 +10,19 @@ library so your GMSB library can be refreshed whenever you download new files.
 It only ever accesses content your own account/tier already grants. See
 [Legal & fair use](#legal--fair-use) below.
 
+## Screenshots
+
+Search, filter by variant and genre, and pick tracks. (Shown signed out, so only
+the free Full versions are listed; signing in adds the Patreon alternates and
+SoundPads.)
+
+![Main window](docs/screenshots/main-window.png)
+
+**More filters** exposes the same Mood / Biome / Civilization / Action categories
+the Tabletop Audio website uses:
+
+![More filters](docs/screenshots/more-filters.png)
+
 ## Download & install
 
 Grab the latest build from the
