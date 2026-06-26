@@ -86,6 +86,9 @@ npm run package    # build installers into dist/ (electron-builder)
 Releases are produced by GitHub Actions: pushing a `vX.Y.Z` tag builds installers
 on Windows/macOS/Linux runners and attaches them to a draft GitHub Release.
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout, conventions, and
+the non-obvious footguns before opening a PR.
+
 ## About this project
 
 This is a free companion tool for Game Master Sound Board, shared under the MIT
