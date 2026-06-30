@@ -88,6 +88,11 @@ describe('buildLibraryDocument', () => {
     expect(doc.Tracks[0].Name).toBe('Millhaven')
     expect(doc.Tracks[1].Name).toBe('Millhaven (Ambient Only)')
   })
+
+  it('routes tracks to buses by stem (full->Music, ambient->Ambient)', () => {
+    expect(doc.Tracks[0].BusId).toBe(1) // full -> Music
+    expect(doc.Tracks[1].BusId).toBe(2) // ambient -> Ambient
+  })
 })
 
 describe('soundpad ShortcutPages', () => {
@@ -140,6 +145,11 @@ describe('soundpad ShortcutPages', () => {
     expect(foghorn.IsLooping).toBe(false)
     const breeze = doc.Tracks.find((t) => t.Name === 'Breeze')!
     expect(breeze.IsLooping).toBe(true)
+  })
+
+  it('routes pad sounds to buses by pad type (sfx->SFX, ambient->Ambient)', () => {
+    expect(doc.Tracks.find((t) => t.Name === 'Foghorn')!.BusId).toBe(3) // SFX
+    expect(doc.Tracks.find((t) => t.Name === 'Breeze')!.BusId).toBe(2) // Ambient
   })
 })
 

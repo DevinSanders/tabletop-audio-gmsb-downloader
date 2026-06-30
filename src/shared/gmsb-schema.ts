@@ -11,6 +11,13 @@
 
 export const GMSB_SCHEMA_VERSION = 2
 
+/** GMSB's built-in audio bus ids (seeded on first launch; Music is the default). */
+export const GMSB_BUS = {
+  music: 1,
+  ambient: 2,
+  sfx: 3
+} as const
+
 export interface GmsbTrack {
   Id: number
   Name: string
@@ -19,6 +26,8 @@ export interface GmsbTrack {
   Tags: string
   Volume: number
   IsLooping: boolean
+  /** Target audio bus (Bus.Id). Ignored by GMSB importers that predate BusId. */
+  BusId: number
 }
 
 export interface GmsbPresetTrack {

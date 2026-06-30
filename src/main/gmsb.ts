@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import { join, resolve } from 'node:path'
 import {
+  GMSB_BUS,
   GMSB_SCHEMA_VERSION,
   type GmsbExportDocument,
   type GmsbShortcutPage,
@@ -62,6 +63,20 @@ function absolutePath(downloadFolder: string, relativePath: string): string {
   return resolve(downloadFolder, relativePath)
 }
 
+/**
+ * Route each track to a GMSB bus: soundpad sounds by their pad type (one-shot
+ * SFX -> SFX, loops -> Music/Ambient); regular TTA tracks by stem (ambient ->
+ * Ambient, everything else -> Music). TTA tracks are never one-shots.
+ */
+function deriveBus(entry: LedgerEntry): number {
+  if (entry.soundpad) {
+    if (entry.padType === 'sfx') return GMSB_BUS.sfx
+    if (entry.padType === 'ambient') return GMSB_BUS.ambient
+    return GMSB_BUS.music
+  }
+  return entry.baseType === 'ambient' ? GMSB_BUS.ambient : GMSB_BUS.music
+}
+
 export function buildLibraryDocument(
   ledger: Ledger,
   idx: ManifestIndex,
@@ -79,7 +94,8 @@ export function buildLibraryDocument(
       Tags: buildTags(e, idx, useCaseByKey),
       Volume: 1.0,
       // TTA beds loop; one-shot pad SFX do not.
-      IsLooping: e.soundpad ? e.padType !== 'sfx' : true
+      IsLooping: e.soundpad ? e.padType !== 'sfx' : true,
+      BusId: deriveBus(e)
     }))
 
   return {
