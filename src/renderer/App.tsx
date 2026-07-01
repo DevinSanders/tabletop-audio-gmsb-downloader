@@ -179,6 +179,18 @@ export function App(): React.JSX.Element {
   const selectAllPads = (): void => setMany(padSelectableIds, true)
   const clearSelection = (): void => setSelected(new Set())
 
+  const onRebuildLibrary = async (): Promise<void> => {
+    if (!folder) return
+    setBusy('Rebuilding library…')
+    setDebugMsg(null)
+    try {
+      const res = await window.api.rebuildLibrary(folder)
+      setDebugMsg(`Rebuilt library with ${res.trackCount} tracks: ${res.libraryPath}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
   const onExportDebug = async (): Promise<void> => {
     setBusy('Exporting Patreon metadata…')
     setDebugMsg(null)
@@ -245,6 +257,13 @@ export function App(): React.JSX.Element {
         </div>
         <button onClick={() => refreshCatalog(folder)} disabled={loadingCatalog}>
           {loadingCatalog ? 'Loading…' : 'Refresh'}
+        </button>
+        <button
+          onClick={onRebuildLibrary}
+          disabled={busy != null || !folder}
+          title="Rewrite gmsb-library.json from already-downloaded files (no downloading)"
+        >
+          Rebuild library
         </button>
         <button onClick={onExportDebug} disabled={busy != null || !auth?.loggedIn} title="Dump raw Patreon metadata for debugging">
           Export Patreon metadata (debug)

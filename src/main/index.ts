@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import { IPC, type DownloadRequest } from '@shared/ipc'
 import { getAuthStatus, login, logout } from './auth'
-import { buildCatalog, runDownload } from './service'
+import { buildCatalog, runDownload, rebuildLibrary } from './service'
 import { exportDebugMetadata } from './patreon'
 import { getSetting, setSetting } from './settings'
 
@@ -54,6 +54,8 @@ function registerIpc(getWindow: () => BrowserWindow | null): void {
   })
 
   ipcMain.handle(IPC.loadCatalog, (_e, downloadFolder: string | null) => buildCatalog(downloadFolder))
+
+  ipcMain.handle(IPC.rebuildLibrary, (_e, downloadFolder: string) => rebuildLibrary(downloadFolder))
 
   ipcMain.handle(IPC.exportPatreonDebug, async (_e, downloadFolder: string | null) => {
     const dest = downloadFolder ?? app.getPath('userData')

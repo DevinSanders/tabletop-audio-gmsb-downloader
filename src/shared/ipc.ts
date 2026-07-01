@@ -33,6 +33,12 @@ export interface DebugExportResult {
   fileCount: number
 }
 
+export interface RebuildResult {
+  /** Absolute path to the rewritten GMSB import library. */
+  libraryPath: string
+  trackCount: number
+}
+
 export interface DownloadResult {
   downloaded: number
   skipped: number
@@ -53,6 +59,8 @@ export interface RendererApi {
   loadCatalog(downloadFolder: string | null): Promise<Catalog>
   /** Dump raw Patreon metadata for debugging; writes files to downloadFolder (or userData). */
   exportPatreonDebug(downloadFolder: string | null): Promise<DebugExportResult>
+  /** Rewrite gmsb-library.json from the ledger without downloading anything. */
+  rebuildLibrary(downloadFolder: string): Promise<RebuildResult>
   startDownload(req: DownloadRequest): Promise<DownloadResult>
   /** Subscribe to per-file progress. Returns an unsubscribe function. */
   onProgress(cb: (e: ProgressEvent) => void): () => void
@@ -67,6 +75,7 @@ export const IPC = {
   getSavedFolder: 'folder:getSaved',
   loadCatalog: 'catalog:load',
   exportPatreonDebug: 'patreon:exportDebug',
+  rebuildLibrary: 'library:rebuild',
   startDownload: 'download:start',
   progress: 'download:progress'
 } as const

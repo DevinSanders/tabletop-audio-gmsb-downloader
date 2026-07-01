@@ -9,6 +9,7 @@ const api: RendererApi = {
   getSavedFolder: () => ipcRenderer.invoke(IPC.getSavedFolder),
   loadCatalog: (downloadFolder) => ipcRenderer.invoke(IPC.loadCatalog, downloadFolder),
   exportPatreonDebug: (downloadFolder) => ipcRenderer.invoke(IPC.exportPatreonDebug, downloadFolder),
+  rebuildLibrary: (downloadFolder) => ipcRenderer.invoke(IPC.rebuildLibrary, downloadFolder),
   startDownload: (req: DownloadRequest) => ipcRenderer.invoke(IPC.startDownload, req),
   onProgress: (cb: (e: ProgressEvent) => void) => {
     const listener = (_e: unknown, payload: ProgressEvent): void => cb(payload)

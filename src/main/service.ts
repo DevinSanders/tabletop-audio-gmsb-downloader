@@ -145,6 +145,19 @@ async function downloadPad(
   }
 }
 
+/** Rewrite gmsb-library.json from the current ledger — no downloading. */
+export async function rebuildLibrary(
+  downloadFolder: string
+): Promise<{ libraryPath: string; trackCount: number }> {
+  const userData = app.getPath('userData')
+  const index = indexManifest(await loadManifest(userData))
+  const useCaseByKey = await loadUseCaseTags(userData)
+  const ledger = await readLedger(downloadFolder)
+  const doc = buildLibraryDocument(ledger, index, useCaseByKey, downloadFolder, new Date())
+  const libraryPath = await writeLibrary(downloadFolder, doc)
+  return { libraryPath, trackCount: doc.Tracks.length }
+}
+
 export async function runDownload(
   req: DownloadRequest,
   emit: (e: ProgressEvent) => void
