@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import { join, resolve } from 'node:path'
 import {
+  BUILT_IN_BUSES,
   GMSB_BUS,
   GMSB_SCHEMA_VERSION,
   type GmsbExportDocument,
@@ -101,6 +102,8 @@ export function buildLibraryDocument(
   return {
     Schema: GMSB_SCHEMA_VERSION,
     ExportedAt: now.toISOString(),
+    // Emit the built-in buses so the importer honors each track's BusId.
+    Buses: BUILT_IN_BUSES,
     Tracks: tracks,
     Presets: [],
     Playlists: [],

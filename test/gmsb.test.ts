@@ -67,8 +67,13 @@ describe('buildLibraryDocument', () => {
   const downloadFolder = process.platform === 'win32' ? 'C:\\dl' : '/dl'
   const doc = buildLibraryDocument(ledger, idx, {}, downloadFolder, new Date('2026-06-26T12:00:00Z'))
 
-  it('produces a Schema 2 document with empty collections', () => {
-    expect(doc.Schema).toBe(2)
+  it('produces a Schema 3 document with the built-in buses and empty collections', () => {
+    expect(doc.Schema).toBe(3)
+    expect(doc.Buses.map((b) => [b.Id, b.Name, b.IsBuiltIn])).toEqual([
+      [1, 'Music', true],
+      [2, 'Ambient', true],
+      [3, 'SFX', true]
+    ])
     expect(doc.Presets).toEqual([])
     expect(doc.Playlists).toEqual([])
     expect(doc.ShortcutPages).toEqual([])
