@@ -1,6 +1,6 @@
 {
   "name": "tta-gmsb-downloader",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Download Tabletop Audio Patreon tracks (and free full versions) and maintain a Game Master Sound Board import library.",
   "type": "module",
   "main": "out/main/index.js",
