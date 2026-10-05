@@ -48,6 +48,14 @@ describe('buildTags', () => {
     expect(tags).toContain('alt:no_queen')
   })
 
+  it('falls back to trackNumber when manifestKey is null (downloaded before TTA listed it)', () => {
+    const useCase = { '514': { civ: [], biome: ['water'], mood: ['peaceful'], action: [] } }
+    const tags = buildTags(entry({ manifestKey: null, trackNumber: 514 }), idx, useCase)
+    expect(tags).toContain('genre:fantasy')
+    expect(tags).toContain('mood:peaceful')
+    expect(tags).toContain('biome:water')
+  })
+
   it('adds use-case tags (mood/biome/civ/action) from the map', () => {
     const useCase = { '514': { civ: ['cities'], biome: ['water'], mood: ['peaceful'], action: ['ritual'] } }
     const tags = buildTags(entry({}), idx, useCase)

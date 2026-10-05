@@ -31,7 +31,10 @@ export function buildTags(
   const variant = deriveVariant(entry.baseType, entry.altDescriptor)
   const tags: string[] = [`type:${VARIANT_TAG[variant]}`, 'category:background']
 
-  const m = entry.manifestKey != null ? idx.byKey.get(entry.manifestKey) : undefined
+  // manifestKey is null for tracks downloaded before TTA listed them publicly;
+  // fall back to the track number so a later rebuild picks up their metadata.
+  const key = entry.manifestKey ?? entry.trackNumber
+  const m = key != null ? idx.byKey.get(key) : undefined
   if (m) {
     for (const g of m.track_genre) {
       // track_genre occasionally comma-joins values in one string element.
@@ -47,7 +50,7 @@ export function buildTags(
   }
 
   // Curated Civilization/Biome/Mood/Action tags from tags_data.js.
-  const uc = entry.manifestKey != null ? useCaseByKey[String(entry.manifestKey)] : undefined
+  const uc = key != null ? useCaseByKey[String(key)] : undefined
   if (uc) {
     for (const category of USECASE_CATEGORIES) {
       for (const key of uc[category]) tags.push(`${category}:${key}`)
