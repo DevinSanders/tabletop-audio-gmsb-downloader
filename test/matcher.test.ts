@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { parseManifest } from '../src/main/manifest'
-import { classifyFile, indexManifest, displayName, type ManifestIndex } from '../src/main/matcher'
+import { classifyFile, indexManifest, displayName, pureStem, type ManifestIndex } from '../src/main/matcher'
 import type { TtaManifestTrack } from '@shared/manifest'
 
 const fixtureRaw = readFileSync(resolve(import.meta.dirname, 'fixtures/tta_data.json'), 'utf8')
@@ -100,6 +100,64 @@ describe('casing and token variants', () => {
     const c = classifyFile('515_Raven_Queen_Music_Only_No_Queen.mp3', idx)
     expect(c.variant).toBe('additional_music')
     expect(c.altDescriptor).toBe('no_queen')
+  })
+})
+
+describe('pure-music / pure-ambience tracks and No_Amb/No_Mus stems', () => {
+  const t = (key: number, title: string, type: string): TtaManifestTrack => ({
+    key,
+    track_title: title,
+    track_type: type,
+    track_genre: [],
+    link: `https://sounds.tabletopaudio.com/${key}.mp3`,
+    tags: []
+  })
+  const sidx = indexManifest([
+    t(900, 'Test Anthem', 'music'),
+    t(901, 'Test Breeze', 'ambience'),
+    t(902, 'Test Feywild', 'ambience + music')
+  ])
+
+  it('maps manifest track_type to a stem only when it is pure', () => {
+    expect(pureStem('music')).toBe('music_only')
+    expect(pureStem(' Ambience ')).toBe('ambient')
+    expect(pureStem('ambience + music')).toBeNull()
+    expect(pureStem('ambience + minimal music')).toBeNull()
+  })
+
+  it('treats the full file of a pure-music track as Music Only, dropping the _320 bitrate tag', () => {
+    const c = classifyFile('900_Test_Anthem_320.mp3', sidx)
+    expect(c.baseType).toBe('music_only')
+    expect(c.variant).toBe('music_only')
+    expect(c.altDescriptor).toBeUndefined()
+  })
+
+  it('treats the full file of a pure-ambience track as Ambient Only', () => {
+    expect(classifyFile('901_Test_Breeze.mp3', sidx).variant).toBe('ambient')
+  })
+
+  it('keeps a mixed track full', () => {
+    expect(classifyFile('902_Test_Feywild.mp3', sidx).variant).toBe('full')
+  })
+
+  it('reads No_Amb as Music Only and No_Mus as Ambient Only', () => {
+    const noAmb = classifyFile('902_Test_Feywild_No_Amb.mp3', sidx)
+    expect(noAmb.variant).toBe('music_only')
+    expect(noAmb.altDescriptor).toBeUndefined()
+    expect(classifyFile('902_Test_Feywild_No_Music.mp3', sidx).variant).toBe('ambient')
+  })
+
+  it("matches titles with apostrophes against apostrophe-less filenames (Wizard's Tower)", () => {
+    const widx = indexManifest([t(174, "Wizard's Tower", 'music')])
+    const c = classifyFile('174_Wizards_Tower_320.mp3', widx)
+    expect(c.altDescriptor).toBeUndefined()
+    expect(c.variant).toBe('music_only')
+  })
+
+  it('keeps version markers on a pure-music track as a descriptor', () => {
+    const c = classifyFile('900_Test_Anthem_Redo_2025.mp3', sidx)
+    expect(c.variant).toBe('music_only')
+    expect(c.altDescriptor).toBe('redo_2025')
   })
 })
 

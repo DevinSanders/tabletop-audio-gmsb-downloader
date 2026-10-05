@@ -16,11 +16,14 @@ export function slugify(name: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
-/** Pad display name from a post title, e.g. "SoundPad: Wuxia (Remastered)" -> "Wuxia". */
+/**
+ * Pad display name from a post title, e.g. "SoundPad: Wuxia (Remastered)" ->
+ * "Wuxia", "SoundPad Remaster: Combat:Future" -> "Combat:Future".
+ */
 export function padNameFromTitle(title: string): string {
   return title
     .replace(/^\s*new\s+/i, '')
-    .replace(/^\s*soundpad:\s*/i, '')
+    .replace(/^\s*soundpad(?:\s+(?:remaster(?:ed)?|preview))?\s*:\s*/i, '')
     .replace(/\s*\(remastered\)\s*$/i, '')
     .trim()
 }
@@ -72,19 +75,32 @@ export interface ExtractedSound {
 }
 
 /**
+ * Audio entries from a zip, nested folders flattened to their (path-safe) base
+ * name, non-audio entries and __MACOSX cruft skipped, sorted by name.
+ */
+export function unzipAudio(zipBytes: Uint8Array): Array<{ fileName: string; data: Uint8Array }> {
+  const entries = unzipSync(zipBytes, {
+    filter: (f) => AUDIO_EXT.test(f.name) && !f.name.includes('__MACOSX/')
+  })
+  const out: Array<{ fileName: string; data: Uint8Array }> = []
+  for (const [entryName, data] of Object.entries(entries)) {
+    if (!data || data.length === 0) continue
+    const rawBase = entryName.split('/').pop()
+    if (!rawBase) continue
+    out.push({ fileName: sanitizeFsName(rawBase), data })
+  }
+  return out.sort((a, b) => a.fileName.localeCompare(b.fileName))
+}
+
+/**
  * Extract audio entries from a pad zip into <downloadFolder>/SoundPads/<padName>/,
- * returning one descriptor per written sound. Non-audio entries and __MACOSX
- * cruft are skipped.
+ * returning one descriptor per written sound.
  */
 export async function extractPadZip(
   zipBytes: Uint8Array,
   downloadFolder: string,
   padName: string
 ): Promise<ExtractedSound[]> {
-  const entries = unzipSync(zipBytes, {
-    filter: (f) => AUDIO_EXT.test(f.name) && !f.name.includes('__MACOSX/')
-  })
-
   // Pad/file names may contain characters illegal in paths (e.g. "Combat: Siege").
   const safePad = sanitizeFsName(padName)
   const relDir = `SoundPads/${safePad}`
@@ -92,23 +108,17 @@ export async function extractPadZip(
   await fs.mkdir(absDir, { recursive: true })
 
   const out: ExtractedSound[] = []
-  for (const [entryName, data] of Object.entries(entries)) {
-    if (!data || data.length === 0) continue
-    const rawBase = entryName.split('/').pop()
-    if (!rawBase) continue
-    const base = sanitizeFsName(rawBase)
-    await fs.writeFile(join(absDir, base), data)
-    const { padType, looping } = classifyPadSound(base)
+  for (const { fileName, data } of unzipAudio(zipBytes)) {
+    await fs.writeFile(join(absDir, fileName), data)
+    const { padType, looping } = classifyPadSound(fileName)
     out.push({
-      fileName: base,
-      relativePath: `${relDir}/${base}`,
-      name: cleanSoundName(base),
+      fileName,
+      relativePath: `${relDir}/${fileName}`,
+      name: cleanSoundName(fileName),
       padType,
       looping,
       sizeBytes: data.length
     })
   }
-  // Stable order by file name for deterministic shortcut-page layout.
-  out.sort((a, b) => a.fileName.localeCompare(b.fileName))
   return out
 }

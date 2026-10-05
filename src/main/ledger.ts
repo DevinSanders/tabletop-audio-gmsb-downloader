@@ -8,6 +8,9 @@ export async function readLedger(downloadFolder: string): Promise<Ledger> {
     const led = JSON.parse(await fs.readFile(path, 'utf8')) as Ledger
     if (!Array.isArray(led.entries)) return emptyLedger(downloadFolder)
     led.downloadRoot = downloadFolder
+    // Older ledgers predate soundpads/packs.
+    if (!Array.isArray(led.pads)) led.pads = []
+    if (!Array.isArray(led.packs)) led.packs = []
     if (typeof led.nextGmsbTrackId !== 'number') {
       led.nextGmsbTrackId = led.entries.reduce((m, e) => Math.max(m, e.gmsbTrackId), 0) + 1
     }

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AuthStatus, DownloadResult, ProgressEvent } from '@shared/ipc'
-import type { Catalog } from '@shared/catalog'
+import type { Catalog, SoundpadEntry } from '@shared/catalog'
 import { VARIANT_LABELS, VARIANT_ORDER, type VariantType } from '@shared/variants'
 import {
   USECASE_CATEGORIES,
@@ -17,7 +17,7 @@ import {
   type FilterState
 } from './lib/filter'
 import { TrackList } from './components/TrackList'
-import { Soundpads } from './components/Soundpads'
+import { Soundpads, isSelectableArchive } from './components/Soundpads'
 
 function formatCount(n: number): string {
   return n.toLocaleString()
@@ -113,19 +113,28 @@ export function App(): React.JSX.Element {
     [catalog]
   )
 
-  const visiblePads = useMemo(() => {
-    const pads = catalog?.soundpads ?? []
-    const q = filters.search.toLowerCase()
-    return pads.filter((p) => {
-      if (filters.newOnly && p.alreadyDownloaded) return false
-      if (filters.hideLocked && p.locked) return false
-      if (q && !p.name.toLowerCase().includes(q)) return false
-      return true
-    })
-  }, [catalog, filters])
+  // Sound boards and audio packs share the same filtering rules.
+  const filterArchives = useCallback(
+    (list: SoundpadEntry[]): SoundpadEntry[] => {
+      const q = filters.search.toLowerCase()
+      return list.filter((p) => {
+        if (filters.newOnly && p.alreadyDownloaded) return false
+        if (filters.hideLocked && p.locked) return false
+        if (q && !p.name.toLowerCase().includes(q)) return false
+        return true
+      })
+    },
+    [filters]
+  )
+  const visiblePads = useMemo(() => filterArchives(catalog?.soundpads ?? []), [catalog, filterArchives])
+  const visiblePacks = useMemo(() => filterArchives(catalog?.packs ?? []), [catalog, filterArchives])
   const padSelectableIds = useMemo(
-    () => visiblePads.filter((p) => !p.locked && !p.alreadyDownloaded).map((p) => p.padId),
+    () => visiblePads.filter(isSelectableArchive).map((p) => p.padId),
     [visiblePads]
+  )
+  const packSelectableIds = useMemo(
+    () => visiblePacks.filter(isSelectableArchive).map((p) => p.padId),
+    [visiblePacks]
   )
 
   const toggleVariant = (v: VariantType): void => {
@@ -177,6 +186,7 @@ export function App(): React.JSX.Element {
 
   const selectAllTracks = (): void => setMany(selectableIds, true)
   const selectAllPads = (): void => setMany(padSelectableIds, true)
+  const selectAllPacks = (): void => setMany(packSelectableIds, true)
   const clearSelection = (): void => setSelected(new Set())
 
   const onRebuildLibrary = async (): Promise<void> => {
@@ -362,7 +372,8 @@ export function App(): React.JSX.Element {
       <div className="selection-bar">
         <span>
           {formatCount(shownTracks.length)} tracks · {formatCount(visiblePads.length)} boards ·{' '}
-          {formatCount(selectableIds.length + padSelectableIds.length)} selectable ·{' '}
+          {formatCount(visiblePacks.length)} packs ·{' '}
+          {formatCount(selectableIds.length + padSelectableIds.length + packSelectableIds.length)} selectable ·{' '}
           <strong>{formatCount(selected.size)}</strong> selected
         </span>
         <div className="spacer" />
@@ -398,11 +409,25 @@ export function App(): React.JSX.Element {
           <>
             <Soundpads
               pads={visiblePads}
+              title="Sound Boards"
+              subtitle="each adds a shortcut page"
+              selectAllLabel="Select all sound boards"
               selected={selected}
               progress={progress}
               onToggle={toggleFile}
               onSelectAll={selectAllPads}
               selectableCount={padSelectableIds.length}
+            />
+            <Soundpads
+              pads={visiblePacks}
+              title="Audio Packs"
+              subtitle="track bundles, added as regular tracks"
+              selectAllLabel="Select all audio packs"
+              selected={selected}
+              progress={progress}
+              onToggle={toggleFile}
+              onSelectAll={selectAllPacks}
+              selectableCount={packSelectableIds.length}
             />
             <TrackList
               tracks={shownTracks}

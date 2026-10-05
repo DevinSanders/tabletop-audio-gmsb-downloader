@@ -46,8 +46,18 @@ export interface Ledger {
   entries: LedgerEntry[]
   /** Soundpads already extracted (drives skip + ShortcutPage generation). */
   pads: PadLedgerEntry[]
+  /** Audio packs already extracted (absent in ledgers written before packs existed). */
+  packs?: PackLedgerEntry[]
+}
+
+/** An audio-pack archive whose tracks have been extracted. */
+export interface PackLedgerEntry {
+  packId: string
+  name: string
+  postId: string
+  downloadedAt: string
 }
 
 export function emptyLedger(downloadRoot: string): Ledger {
-  return { version: LEDGER_VERSION, downloadRoot, nextGmsbTrackId: 1, entries: [], pads: [] }
+  return { version: LEDGER_VERSION, downloadRoot, nextGmsbTrackId: 1, entries: [], pads: [], packs: [] }
 }

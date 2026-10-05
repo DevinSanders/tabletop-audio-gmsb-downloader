@@ -46,6 +46,8 @@ function normalize(s: string): string {
   return s
     .toLowerCase()
     .replace(/&/g, 'and')
+    // Drop apostrophes so "Wizard's" matches the filename's "Wizards".
+    .replace(/['’`]/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
 }
@@ -56,6 +58,24 @@ function tight(s: string): string {
 
 const BASE_MUSIC_RE = /(?:^|[ _\-])(?:mus|music)[ _]?only(?=$|[ _\-])/i
 const BASE_AMBIENT_RE = /(?:^|[ _\-])(?:amb|ambient|ambience)[ _]?only(?=$|[ _\-])/i
+// "No Ambience" leaves only the music (and vice versa), e.g. 169_The_Feywild_No_Amb.
+const NO_AMB_RE = /(?:^|[ _\-])no[ _\-]?(?:amb|ambient|ambience)(?=$|[ _\-])/i
+const NO_MUS_RE = /(?:^|[ _\-])no[ _\-]?(?:mus|music)(?=$|[ _\-])/i
+
+// Bitrate/quality markers (e.g. 171_Cry_Havoc_320) describe the encoding, not a
+// different recording, so they're dropped from the descriptor.
+const QUALITY_TOKEN_RE = /^(?:320|256|224|192|160|128|96|64)k?$|^(?:kbps|hq|hd|lossless)$/
+
+/**
+ * Tracks whose manifest type is pure "music" or pure "ambience" have no separate
+ * stem: their full version IS the music-only / ambient-only version.
+ */
+export function pureStem(trackType: string | undefined): BaseType | null {
+  const t = (trackType ?? '').toLowerCase().trim()
+  if (t === 'music') return 'music_only'
+  if (t === 'ambience' || t === 'ambient') return 'ambient'
+  return null
+}
 
 // A trailing run of one or more isolation qualifiers (No_X, Min, Loop, vN, altN).
 const ISOLATION_RUN_RE =
@@ -88,7 +108,19 @@ function detectBaseType(rest: string): { baseType: BaseType; stripped: string } 
   if (BASE_AMBIENT_RE.test(rest)) {
     return { baseType: 'ambient', stripped: rest.replace(BASE_AMBIENT_RE, ' ') }
   }
+  if (NO_AMB_RE.test(rest)) {
+    return { baseType: 'music_only', stripped: rest.replace(NO_AMB_RE, ' ') }
+  }
+  if (NO_MUS_RE.test(rest)) {
+    return { baseType: 'ambient', stripped: rest.replace(NO_MUS_RE, ' ') }
+  }
   return { baseType: 'full', stripped: rest }
+}
+
+function stripQuality(descriptor: string | undefined): string | undefined {
+  if (!descriptor) return undefined
+  const kept = descriptor.split('_').filter((t) => t && !QUALITY_TOKEN_RE.test(t))
+  return kept.length ? kept.join('_') : undefined
 }
 
 /** Split a base-stripped name into its title core and a trailing isolation descriptor. */
@@ -116,7 +148,9 @@ function titleCase(s: string): string {
 export function classifyFile(fileName: string, idx: ManifestIndex): ClassifiedFile {
   const base = stripExt(fileName)
   const { num, rest } = leadingNumber(base)
-  const { baseType, stripped } = detectBaseType(rest)
+  const detected = detectBaseType(rest)
+  const stripped = detected.stripped
+  let baseType = detected.baseType
   const { core, residual: filenameResidual } = splitIsolation(stripped)
 
   // Resolve the manifest track: number first, then normalized/tight title core.
@@ -142,6 +176,10 @@ export function classifyFile(fileName: string, idx: ManifestIndex): ClassifiedFi
   } else if (filenameResidual) {
     altDescriptor = filenameResidual
   }
+  altDescriptor = stripQuality(altDescriptor)
+
+  // A "full" file of a pure-music / pure-ambience track is really that stem.
+  if (baseType === 'full' && matched) baseType = pureStem(matched.track_type) ?? 'full'
 
   // A stem with an isolation/removal token (No_X, Min) becomes its "Additional"
   // bucket; a full mix with one becomes "Other". A version/re-upload marker

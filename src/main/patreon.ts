@@ -3,7 +3,20 @@ import { dirname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { apiGetJson, patreonSession } from './auth'
-import { padNameFromTitle, slugify } from './soundpad'
+import {
+  AUDIO_EXT,
+  flattenPage,
+  indexIncluded,
+  mediaNameAndUrl,
+  relationshipRefs,
+  type PatreonContent,
+  type RawPack,
+  type RawPatreonFile,
+  type RawSoundpad
+} from './patreon-parse'
+
+export type { PatreonContent, RawPack, RawPatreonFile, RawSoundpad }
+export { flattenPage }
 
 /**
  * Lightweight Tabletop Audio Patreon client built on the persistent Electron
@@ -18,36 +31,6 @@ import { padNameFromTitle, slugify } from './soundpad'
  */
 
 const CREATOR_VANITY = 'tabletopaudio'
-const AUDIO_EXT = /\.(mp3|ogg|wav|flac|m4a|opus|aac)$/i
-const ARCHIVE_EXT = /\.(zip|rar)$/i
-const IMAGE_EXT = /\.(jpe?g|png|gif|webp)$/i
-const SOUNDPAD_TITLE_RE = /^\s*(new\s+)?soundpad:/i
-
-export interface RawPatreonFile {
-  fileName: string
-  url: string
-  postId: string
-  postTitle?: string
-  /** Whether the signed-in account can download this attachment (tier access). */
-  canView: boolean
-}
-
-export interface RawSoundpad {
-  postId: string
-  title: string
-  name: string
-  slug: string
-  archiveFileName: string
-  archiveUrl: string
-  isZip: boolean
-  imageUrl?: string
-  canView: boolean
-}
-
-export interface PatreonContent {
-  files: RawPatreonFile[]
-  pads: RawSoundpad[]
-}
 
 /** Discover Tabletop Audio's numeric campaign id by scraping the creator page. */
 export async function resolveCampaignId(): Promise<string | null> {
@@ -101,116 +84,27 @@ async function fetchAllPages(campaignId: string): Promise<any[]> {
   return pages
 }
 
-/** Index every included object by `${type}:${id}` and by bare id (fallback). */
-function indexIncluded(doc: any): Map<string, any> {
-  const map = new Map<string, any>()
-  for (const inc of doc?.included ?? []) {
-    map.set(`${inc.type}:${inc.id}`, inc)
-    if (!map.has(inc.id)) map.set(inc.id, inc)
-  }
-  return map
-}
 
-/** All referenced {type,id} across every relationship of a post. */
-function relationshipRefs(post: any): Array<{ type?: string; id: string }> {
-  const refs: Array<{ type?: string; id: string }> = []
-  for (const rel of Object.values(post?.relationships ?? {})) {
-    const data = (rel as any)?.data
-    if (Array.isArray(data)) refs.push(...data)
-    else if (data?.id) refs.push(data)
-  }
-  return refs
-}
-
-function mediaNameAndUrl(inc: any): { name?: string; url?: string } {
-  const a = inc?.attributes ?? {}
-  return {
-    name: a.file_name ?? a.name ?? undefined,
-    url: a.download_url ?? a.url ?? undefined
-  }
-}
-
-interface MediaItem {
-  name: string
-  url: string
-}
-
-/** All distinct media (name+url) attached to a post, by relationship scan. */
-function postMedia(doc: any, post: any): MediaItem[] {
-  const includedById = indexIncluded(doc)
-  const seen = new Set<string>()
-  const items: MediaItem[] = []
-  for (const ref of relationshipRefs(post)) {
-    const inc = includedById.get(`${ref.type}:${ref.id}`) ?? includedById.get(ref.id)
-    if (!inc) continue
-    const { name, url } = mediaNameAndUrl(inc)
-    if (name && url && !seen.has(name)) {
-      seen.add(name)
-      items.push({ name, url })
-    }
-  }
-  return items
-}
-
-function flattenPage(doc: any): PatreonContent {
-  const files: RawPatreonFile[] = []
-  const pads: RawSoundpad[] = []
-
-  for (const post of doc?.data ?? []) {
-    const canView = Boolean(post.attributes?.current_user_can_view)
-    const title: string = post.attributes?.title ?? ''
-    const media = postMedia(doc, post)
-    const isPadPost = SOUNDPAD_TITLE_RE.test(title)
-
-    if (isPadPost) {
-      // Soundpads ship a single archive; their loose promo mp3s are excluded
-      // from the regular track list to avoid clutter.
-      const archive = media.find((m) => ARCHIVE_EXT.test(m.name))
-      if (archive) {
-        const image = media.find((m) => IMAGE_EXT.test(m.name))
-        const name = padNameFromTitle(title)
-        pads.push({
-          postId: String(post.id),
-          title,
-          name,
-          slug: slugify(name),
-          archiveFileName: archive.name,
-          archiveUrl: archive.url,
-          isZip: /\.zip$/i.test(archive.name),
-          imageUrl: image?.url,
-          canView
-        })
-      }
-      continue
-    }
-
-    for (const m of media) {
-      if (AUDIO_EXT.test(m.name)) {
-        files.push({ fileName: m.name, url: m.url, postId: String(post.id), postTitle: title, canView })
-      }
-    }
-  }
-  return { files, pads }
-}
-
-/** Enumerate all tracks and soundpads across every post. */
+/** Enumerate all tracks, soundpads, and audio packs across every post. */
 export async function fetchPatreonContent(campaignId: string): Promise<PatreonContent> {
   const pages = await fetchAllPages(campaignId)
   const files: RawPatreonFile[] = []
   const padBySlug = new Map<string, RawSoundpad>()
+  const packByArchive = new Map<string, RawPack>()
   for (const page of pages) {
-    const { files: f, pads } = flattenPage(page)
+    const { files: f, pads, packs } = flattenPage(page)
     files.push(...f)
-    // Pages are newest-first; keep the first (latest, e.g. remastered) per slug.
+    // Pages are newest-first; keep the first (latest, e.g. remastered) of each.
     for (const p of pads) if (!padBySlug.has(p.slug)) padBySlug.set(p.slug, p)
+    for (const p of packs) if (!packByArchive.has(p.archiveFileName)) packByArchive.set(p.archiveFileName, p)
   }
-  return { files, pads: [...padBySlug.values()] }
+  return { files, pads: [...padBySlug.values()], packs: [...packByArchive.values()] }
 }
 
 /** Convenience: resolve campaign then enumerate; returns empty on any failure. */
 export async function loadPatreonContent(): Promise<PatreonContent> {
   const campaignId = await resolveCampaignId()
-  if (!campaignId) return { files: [], pads: [] }
+  if (!campaignId) return { files: [], pads: [], packs: [] }
   return fetchPatreonContent(campaignId)
 }
 

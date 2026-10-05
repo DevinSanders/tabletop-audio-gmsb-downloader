@@ -2,8 +2,8 @@ import type { Catalog, CatalogFile, CatalogTrack, SoundpadEntry } from '@shared/
 import type { TtaManifestTrack } from '@shared/manifest'
 import type { Ledger } from '@shared/ledger'
 import type { VariantType } from '@shared/variants'
-import { classifyFile, composeName, type ManifestIndex } from './matcher'
-import type { RawPatreonFile, RawSoundpad } from './patreon'
+import { classifyFile, composeName, pureStem, type ManifestIndex } from './matcher'
+import type { RawPack, RawPatreonFile, RawSoundpad } from './patreon'
 import type { UseCaseTags } from '@shared/usecase'
 import { useCaseForKey } from './usecase'
 
@@ -47,7 +47,8 @@ export function assembleCatalog(
   patreonPads: RawSoundpad[],
   useCaseByKey: Record<string, UseCaseTags>,
   ledger: Ledger,
-  now: Date
+  now: Date,
+  patreonPacks: RawPack[] = []
 ): Catalog {
   const have = new Set(ledger.entries.map((e) => e.fileId))
   const groups = new Map<string, CatalogTrack>()
@@ -90,16 +91,18 @@ export function assembleCatalog(
     return g
   }
 
-  // 1. Public Full version for every manifest track.
+  // 1. Public version for every manifest track. For a pure-music / pure-ambience
+  //    track this IS the music-only / ambient-only stem, so classify it as such.
   for (const m of manifestTracks) {
     const g = ensureGroup(m.key, m.track_title, m)
     const fileId = `public:${m.key}`
+    const stem = pureStem(m.track_type) ?? 'full'
     g.files.push({
       fileId,
       fileName: basename(m.link),
-      displayName: m.track_title,
-      variant: 'full',
-      baseType: 'full',
+      displayName: composeName(m.track_title, stem),
+      variant: stem,
+      baseType: stem,
       source: 'public',
       url: m.link,
       locked: false,
@@ -115,8 +118,10 @@ export function assembleCatalog(
     // (e.g. "Lonesome West No Horses No Rain") joins its numbered track.
     const groupNumber = c.trackNumber ?? c.matched?.key ?? null
     const g = ensureGroup(groupNumber, c.title, c.matched ?? undefined)
-    // Avoid a duplicate Full when the public link already provides it.
-    if (c.variant === 'full' && g.files.some((f) => f.variant === 'full' && f.source === 'public')) {
+    // Same recording as the public link (no descriptor once bitrate markers like
+    // "_320" are stripped) — keep the public copy. Versions ("Redo 2025") and
+    // isolations still carry a descriptor, so they're kept as separate files.
+    if (!c.altDescriptor && g.files.some((f) => f.source === 'public' && f.variant === c.variant)) {
       continue
     }
     if (pf.canView) hasPatreonAccess = true
@@ -156,6 +161,32 @@ export function assembleCatalog(
     })
     .sort((a, b) => a.name.localeCompare(b.name))
 
+  // 4. Audio packs (zips of tracks in regular posts) — extracted and classified
+  //    as ordinary tracks on download, no shortcut page.
+  const packsHave = new Set((ledger.packs ?? []).map((p) => p.packId))
+  const packs: SoundpadEntry[] = patreonPacks
+    .map((p) => {
+      if (p.canView) hasPatreonAccess = true
+      const id = packId(p)
+      return {
+        padId: id,
+        postId: p.postId,
+        name: p.name,
+        slug: id,
+        archiveFileName: p.archiveFileName,
+        archiveUrl: p.archiveUrl,
+        isZip: p.isZip,
+        locked: !p.canView,
+        alreadyDownloaded: packsHave.has(id)
+      }
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+
   const tracks = [...groups.values()].sort((a, b) => (b.number ?? 0) - (a.number ?? 0))
-  return { generatedAt: now.toISOString(), tracks, soundpads, hasPatreonAccess }
+  return { generatedAt: now.toISOString(), tracks, soundpads, packs, hasPatreonAccess }
+}
+
+/** Stable selection id for an audio pack archive. */
+export function packId(p: Pick<RawPack, 'postId' | 'archiveFileName'>): string {
+  return `pack:${p.postId}:${p.archiveFileName}`
 }

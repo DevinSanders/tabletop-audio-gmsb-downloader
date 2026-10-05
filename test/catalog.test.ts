@@ -4,7 +4,8 @@ import { describe, it, expect } from 'vitest'
 import { parseManifest } from '../src/main/manifest'
 import { indexManifest } from '../src/main/matcher'
 import { assembleCatalog, relativePathFor, variantFolder } from '../src/main/catalog'
-import type { RawPatreonFile, RawSoundpad } from '../src/main/patreon'
+import type { RawPack, RawPatreonFile, RawSoundpad } from '../src/main/patreon'
+import type { TtaManifestTrack } from '@shared/manifest'
 import { emptyLedger } from '@shared/ledger'
 
 const realTracks = parseManifest(
@@ -121,6 +122,60 @@ describe('soundpads in catalog', () => {
     led.pads.push({ slug: 'wuxia', name: 'Wuxia', postId: '137', downloadedAt: now.toISOString() })
     const cat = assembleCatalog([millhaven], idx, [], [pad], {}, led, now)
     expect(cat.soundpads[0].alreadyDownloaded).toBe(true)
+  })
+})
+
+describe('pure-music tracks and audio packs in catalog', () => {
+  const anthem: TtaManifestTrack = {
+    key: 900,
+    track_title: 'Test Anthem',
+    track_type: 'music',
+    track_genre: [],
+    link: 'https://sounds.tabletopaudio.com/900_Test_Anthem.mp3',
+    tags: []
+  }
+  const aidx = indexManifest([anthem])
+  const pf = (fileName: string): RawPatreonFile => ({ fileName, url: 'u', postId: 'p900', canView: true })
+
+  it('lists the public file of a pure-music track as Music Only', () => {
+    const cat = assembleCatalog([anthem], aidx, [], [], {}, emptyLedger('/dl'), now)
+    const f = group(cat, 900)!.files[0]
+    expect(f.variant).toBe('music_only')
+    expect(f.displayName).toBe('Test Anthem (Music Only)')
+  })
+
+  it('dedupes a higher-bitrate copy but keeps a different version', () => {
+    const cat = assembleCatalog(
+      [anthem],
+      aidx,
+      [pf('900_Test_Anthem_320.mp3'), pf('900_Test_Anthem_Redo_2025.mp3')],
+      [],
+      {},
+      emptyLedger('/dl'),
+      now
+    )
+    const files = group(cat, 900)!.files
+    expect(files.map((f) => f.source + ':' + (f.altDescriptor ?? ''))).toEqual(['public:', 'patreon:redo_2025'])
+  })
+
+  it('exposes audio packs and flags downloaded ones from the ledger', () => {
+    const pack: RawPack = {
+      postId: 'p1',
+      title: 'New Ambiences: Distilled',
+      name: 'Distilled — Distilled-Audio1',
+      archiveFileName: 'Distilled-Audio1.zip',
+      archiveUrl: 'u',
+      isZip: true,
+      canView: true
+    }
+    const fresh = assembleCatalog([anthem], aidx, [], [], {}, emptyLedger('/dl'), now, [pack])
+    expect(fresh.packs.map((p) => p.padId)).toEqual(['pack:p1:Distilled-Audio1.zip'])
+    expect(fresh.packs[0].alreadyDownloaded).toBe(false)
+
+    const led = emptyLedger('/dl')
+    led.packs!.push({ packId: 'pack:p1:Distilled-Audio1.zip', name: pack.name, postId: 'p1', downloadedAt: now.toISOString() })
+    const done = assembleCatalog([anthem], aidx, [], [], {}, led, now, [pack])
+    expect(done.packs[0].alreadyDownloaded).toBe(true)
   })
 })
 

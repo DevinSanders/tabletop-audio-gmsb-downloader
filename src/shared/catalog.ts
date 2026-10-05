@@ -60,6 +60,8 @@ export interface Catalog {
   /** Total distinct tracks (manifest size, plus any Patreon-only extras). */
   tracks: CatalogTrack[]
   soundpads: SoundpadEntry[]
+  /** Zips of tracks shipped in regular posts (e.g. Distilled, Apothecaria OST). */
+  packs: SoundpadEntry[]
   /** True if any Patreon-sourced (gated) files are present and unlocked. */
   hasPatreonAccess: boolean
 }
